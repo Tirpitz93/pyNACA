@@ -1,7 +1,5 @@
-from math import floor, sin, tan
-
 import numpy as np
-from numpy import pi, zeros, linspace, cos
+from numpy import arctan as atan, sin, cos, pi, zeros, linspace
 from pandas import DataFrame, Series
 
 
@@ -47,17 +45,42 @@ def four_digit(n: [str, int], alpha=0, c=1, s=100, cs: bool = False):
     """
     # 4 Digit Series
     x = linspace(0, 1, s + 1)
+
+
+
     if isinstance(n, str):
         thickness = int(n[2:]) / 100
+        camber = int(n[0]) / 100
+        camber_position = int(n[1]) / 10
     else:
         thickness = n % 100 / 100
+        camber = n // 1000 / 100
+        camber_position = (n % 1000) // 100 / 10
     if cs:
         x = cosine_spacing(x)
-    top_surface = 5 * thickness * (0.2969 * x ** 0.5 - 0.1260 * x - 0.3516 * x ** 2 + 0.2843 * x ** 3 - 0.1015 * x ** 4)
-    bottom_surface = -top_surface
-    # print(top_surface)
-    # print(bottom_surface)
-    return DataFrame({"x":x,'top': top_surface, 'bottom': bottom_surface})
+    # Camber Line
+    yc = zeros(s + 1)
+    dycdx = zeros(s + 1)
+    if camber != 0:
+        for i in range(s + 1):
+            if x[i] <= camber_position:
+                yc[i] = camber / camber_position ** 2 * (2 * camber_position * x[i] - x[i] ** 2)
+                dycdx[i] = 2 * camber / camber_position ** 2 * (camber_position - x[i])
+            else:
+                yc[i] = camber / (1 - camber_position) ** 2 * ((1 - 2 * camber_position) + 2 * camber_position * x[i] - x[i] ** 2)
+                dycdx[i] = 2 * camber / (1 - camber_position) ** 2 * (camber_position - x[i])
+
+    yu_init = 5 * thickness * (0.2969 * x ** 0.5 - 0.1260 * x - 0.3516 * x ** 2 + 0.2843 * x ** 3 - 0.1015 * x ** 4)
+
+    xl = x - yu_init * sin(atan(dycdx))
+    xu = x + yu_init * sin(atan(dycdx))
+    yl = yc - yu_init * cos(atan(dycdx))
+    yu = yc + yu_init * cos(atan(dycdx))
+    # print(yu)
+    # print(yl)
+    return DataFrame({"xu":xu,'yu': yu, 'xl': xl, 'yl': yl})
+
+
 
 
 if __name__ == '__main__':
