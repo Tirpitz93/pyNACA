@@ -79,12 +79,12 @@ class NACA(abc.ABC):
         raise NotImplementedError
 
     @property
-    def x(self) -> DataFrame:
+    def x(self) -> Series:
         """
         Returns the x coordinates of the chord line.
         :return:
         """
-        return Series(linspace(0, 1, self.n + 1)) if not self.cs else self.cosine_spacing(linspace(0, 1, self.n + 1))
+        return Series(linspace(0, 1, self.n + 1), name="x" ) if not self.cs else Series(self.cosine_spacing(linspace(0, 1, self.n + 1) ), name="x")
 
     @property
     @scale
@@ -111,8 +111,22 @@ class NACA(abc.ABC):
         raise NotImplementedError
 
     @property
-    def camber_gradient(self) -> DataFrame:
-        raise NotImplementedError
+    def camber_gradient(self):
+        """
+        Returns the camber gradient.
+        :return:
+        """
+
+        return Series([self._camber_gradient(x) for x in self.x], index=self.x, name="Camber Gradient")
+
+    @property
+    def camber_line(self):
+        """
+        Returns the camber line.
+        :return:
+        """
+        return Series([self._camber_line(x) for x in self.x], index=self.x, name="Camber Line")
+
 
     @property
     def camber(self) -> DataFrame:
@@ -130,53 +144,65 @@ class NACA(abc.ABC):
     def df(self):
         return pd.concat([self.upper, self.lower, self.camber], axis=1)
 
+    def _camber_gradient(self, x):
+        raise NotImplementedError
+
+    def _camber_line(self, x):
+        raise NotImplementedError
+
 
 class NACA4Digit(NACA):
-
-    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False):
+    a1 = 0.2969
+    a2 = -0.126
+    a3 = -0.3516
+    a4 = 0.2843
+    a5 = -0.1015
+    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False, ct:bool=False):
         self.identifier = identifier
+        if isinstance(identifier, int):
+            self.identifier = str(identifier)
         self.n = n
         self.chord_length = chord
-        if isinstance(identifier, int):
-            self.max_camber = identifier // 1000
-            self.max_camber_position = (identifier % 1000) // 100
-            self.thickness = identifier % 100
-        elif isinstance(identifier, str):
-            self.max_camber = int(identifier[0]) / 100
-            self.max_camber_position = int(identifier[1]) / 10
-            self.thickness = int(identifier[2:]) / 100
-        else:
-            raise TypeError("identifier must be int or str")
+        self.ct = ct
+        if self.ct:
+            self.a5 = 0.1036
+
+        self.max_camber = int(self.identifier[0]) / 100
+        self.max_camber_position = int(self.identifier[1]) / 10
+        self.thickness = int(self.identifier[2:]) / 100
         self.top = zeros(n)
         self.bottom = zeros(n)
         self.cs = cs
-
-    @property
-    def camber_line(self):
-        """
-        Returns the camber line.
-        :return:
-        """
-        if self.max_camber == 0:
-            return Series(zeros(self.n), index=self.x)
+        if self.ct:
+            assert self.a5 == 0.1036
         else:
-            return Series(self.max_camber / self.max_camber_position ** 2 * (
-                    2 * self.max_camber_position * self.x - self.x ** 2) * (self.x <= self.max_camber_position) +
-                          self.max_camber / (1 - self.max_camber_position) ** 2 * ((
-                                                                                           1 - 2 * self.max_camber_position) + 2 * self.max_camber_position * self.x - self.x ** 2) * (
-                                  self.x > self.max_camber_position),
-                          index=self.x)
+            assert self.a5 == -0.1015
 
-    def camber_gradient(self):
+    def _camber_line(self, x):
         """
-        Returns the camber gradient.
+        Returns the y coordinate of the camber line at x.
+        :param x:
         :return:
         """
-        return Series(self.max_camber / self.max_camber_position * (2 * self.max_camber_position - 2 * self.x) * (
-                self.x <= self.max_camber_position) +
-                      self.max_camber / (1 - self.max_camber_position) ** 2 * (
-                              2 * self.max_camber_position - 2 * self.x) * (self.x > self.max_camber_position),
-                      index=self.x)
+        if x < self.max_camber_position:
+            return self.max_camber / self.max_camber_position ** 2 * (2 * self.max_camber_position * x - x ** 2)
+        else:
+            return self.max_camber / (1 - self.max_camber_position) ** 2 * (
+                    1 - 2 * self.max_camber_position + 2 * self.max_camber_position * x - x ** 2)
+
+
+
+    def _camber_gradient(self, x):
+        """
+        Returns the camber gradient at x.
+        :param x:
+        :return:
+        """
+        if x < self.max_camber_position:
+            return 2 * self.max_camber / self.max_camber_position ** 2 * (self.max_camber_position - x)
+        else:
+            return 2 * self.max_camber / (1 - self.max_camber_position) ** 2 * (self.max_camber_position - x)
+
 
     @classmethod
     def check_digits(cls, digits: [str, int]):
@@ -185,6 +211,7 @@ class NACA4Digit(NACA):
         elif isinstance(digits, int):
             return True if 1000 <= digits <= 9999 else False
         raise TypeError("digits must be str or int")
+
 
 
 class NACA5DigitStandard(NACA4Digit):
@@ -229,31 +256,17 @@ class NACA5DigitStandard(NACA4Digit):
         assert 0.05 <= self.max_camber_position <= 0.5
         assert 0 <= self.thickness <= 1
         assert self.reflex is False
+    def _camber_line(self, x):
+        k1 = self.k_1_values[self.digit_2]
+        r = self.r_values[self.digit_2]
+        return (k1/6)*(x**3 - 3*r*x**2 + r**2*(3-r)*x) if x <= self.max_camber_position else \
+            ((k1*r**3)/6)*(1-x)
 
-    def camber_line(self):
-        """
-        Returns the camber line.
-        :return:
-        """
-        def _camber_line(x):
-            k1 = self.k_1_values[self.digit_2]
-            r = self.r_values[self.digit_2]
-            return (k1/6)*(x**3 - 3*r*x**2 + r**2*(3-r)*x) if x <= self.max_camber_position else \
-                ((k1*r**3)/6)*(1-x)
-        return Series([_camber_line(x) for x in self.x], index=self.x)
-
-
-    def camber_gradient(self):
-        """
-        Returns the camber gradient.
-        :return:
-        """
-        def _camber_gradient(x):
-            k1 = self.k_1_values[self.digit_2]
-            r = self.r_values[self.digit_2]
-            return (k1/6)*(3*x**2 - 6*r*x + r**2*(3-r)) if x <= self.max_camber_position else \
-                -((k1*r**3)/6)
-        return Series([_camber_gradient(x) for x in self.x], index=self.x)
+    def _camber_gradient(self, x):
+        k1 = self.k_1_values[self.digit_2]
+        r = self.r_values[self.digit_2]
+        return (k1/6)*(3*x**2 - 6*r*x + r**2*(3-r)) if x <= self.max_camber_position else \
+            -((k1*r**3)/6)
 
     @classmethod
     def check_digits(cls, digits: [str, int]):
@@ -297,57 +310,58 @@ class NACA5DigitReflex(NACA5DigitStandard):
             return True if 10000 <= digits <= 99999 and digits % 1000 // 100 == 1 else False
         raise TypeError("digits must be str or int")
 
+    def _camber_line(self, x):
+        r = self.r_values[self.digit_2]
+        k1 = self.k_1_values[self.digit_2]
+        k2_k1 = self.k_2_k_1_values[self.digit_2]
+        return (
+                (k1 / 6) *
+                (
+                        (x - r) ** 3
+                        - (k2_k1 * (1 - r) ** 3) * x
+                        - ((r ** 3) * x)
+                        + r ** 3)
+        ) \
+            if x < self.max_camber_position else (
+                (k1 / 6) *
+                (
+                        k2_k1 * (x - r) ** 3
+                        - (k2_k1 * (1 - r) ** 3) * x
+                        - ((r ** 3) * x)
+                        + (r ** 3))
+        )
     @property
     def camber_line(self):
-        def _camber_line(x):
-            r = self.r_values[self.digit_2]
-            k1 = self.k_1_values[self.digit_2]
-            k2_k1 = self.k_2_k_1_values[self.digit_2]
-            return (
-                    (k1 / 6) *
-                    (
-                            (x - r) ** 3
-                            - (k2_k1 * (1 - r) ** 3) * x
-                            - ((r ** 3) * x)
-                            + r ** 3)
-            ) \
-                if x < self.max_camber_position else (
-                    (k1 / 6) *
-                    (
-                            k2_k1 * (x - r) ** 3
-                            - (k2_k1 * (1 - r) ** 3) * x
-                            - ((r ** 3) * x)
-                            + (r ** 3))
-            )
+        return Series([self._camber_line(x) for x in self.x], index=self.x)
 
-        return Series([_camber_line(x) for x in self.x], index=self.x)
 
+    def _camber_gradient(self, x):
+        r = self.r_values[self.digit_2]
+        k1 = self.k_1_values[self.digit_2]
+        k2_k1 = self.k_2_k_1_values[self.digit_2]
+        return (
+                (k1 / 6) *
+                (
+                        3 * (x - r) ** 2
+                        - (k2_k1 * (1 - r) ** 3)
+                        - (r ** 3))
+        ) \
+            if x < self.max_camber_position else (
+                (k1 / 6) *
+                (
+                        3 * k2_k1 * (x - r) ** 2
+                        - (k2_k1 * (1 - r) ** 3)
+                        - (r ** 3))
+        )
     @property
     def camber_gradient(self):
-        def _camber_gradient(x):
-            r = self.r_values[self.digit_2]
-            k1 = self.k_1_values[self.digit_2]
-            k2_k1 = self.k_2_k_1_values[self.digit_2]
-            return (
-                    (k1 / 6) *
-                    (
-                            3 * (x - r) ** 2
-                            - (k2_k1 * (1 - r) ** 3)
-                            - (r ** 3))
-            ) \
-                if x < self.max_camber_position else (
-                    (k1 / 6) *
-                    (
-                            3 * k2_k1 * (x - r) ** 2
-                            - (k2_k1 * (1 - r) ** 3)
-                            - (r ** 3))
-            )
 
-        return Series([_camber_gradient(x) for x in self.x], index=self.x)
+
+        return Series([self._camber_gradient(x) for x in self.x], index=self.x)
 
 if __name__ == '__main__':
-    ns = NACA.factory("23112", chord=4)
-    ni = NACA.factory(23112, chord=4)
+    ns = NACA.factory("23112", chord=4, cs=True)
+    ni = NACA.factory(23112, chord=4, cs=True)
     print(ni.identifier)
     print(ni.__class__.__name__)
     assert ns.identifier == ni.identifier
@@ -359,3 +373,13 @@ if __name__ == '__main__':
     assert ns.design_cl == ni.design_cl == 0.3
     print(ns.camber_line)
     print(ns.camber_gradient)
+    n4s = NACA.factory("2312", chord=4)
+    n4i = NACA.factory(2312, chord=4)
+    print(n4s.identifier)
+    print(n4s.__class__.__name__)
+    assert n4s.identifier == n4i.identifier == "2312"
+    assert n4s.__class__.__name__ == n4i.__class__.__name__ == "NACA4Digit"
+    print(n4s.max_camber)
+    assert n4s.max_camber == n4i.max_camber == 0.02
+    assert n4s.max_camber_position == n4i.max_camber_position == 0.3
+    assert n4s.thickness == n4i.thickness == 0.12
