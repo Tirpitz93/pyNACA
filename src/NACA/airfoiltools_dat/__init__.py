@@ -1,9 +1,14 @@
 """
 
 """
-import pandas
-from pandas import Series
+import os
 
+import diskcache
+import pandas
+from diskcache import Cache
+from pandas import Series, DataFrame
+
+airfoiltools_cache = Cache(os.path.join(os.path.dirname(__file__), "cache"))
 
 class AirfoilToolsDatFile(object):
 
@@ -29,8 +34,11 @@ class AirfoilToolsDatFile(object):
         # print(self.top)
         # print(self.bottom)
 
-
-
+    @staticmethod
+    @airfoiltools_cache.memoize("airfoil",expire=0, tag="airfoiltools_dat")
+    def load(designation: str) -> DataFrame:
+        #todo: load dat file from airfoiltools.com
+        raise NotImplementedError
 
 if __name__ == "__main__":
     a = AirfoilToolsDatFile("src/NACA/tests/data/airfoiltools/NACA0012.dat")
