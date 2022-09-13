@@ -2,6 +2,7 @@
 
 """
 import pandas
+from matplotlib import pyplot as plt
 from pandas import Series
 
 
@@ -29,9 +30,26 @@ class AirfoilToolsDatFile(object):
         # print(self.top)
         # print(self.bottom)
 
+    def plot(self) -> None:
+        """
+        Plots the airfoil.
+        :return: None
+        """
 
+        fig, ax = plt.subplots()
+        ax.plot(self.df["xu"], self.df["yu"])
+        ax.plot(self.df["xl"], self.df["yl"])
+        if "xc" in self.df.columns.tolist() and "yc" in self.df.columns.tolist():
+            ax.plot(self.df["xc"], self.df["yc"])
+        # ax.plot(self.df["xc"], self.df["yc"])
+        fig.legend(["Upper Surface", "Lower Surface", "Camber Line"])
+        # plt.xlim(0, 1)
+        # plt.ylim(-0.5, 0.5)
+        plt.gca().set_aspect('equal', adjustable='box')
+        fig.show()
 
 
 if __name__ == "__main__":
-    a = AirfoilToolsDatFile("src/NACA/tests/data/airfoiltools/NACA0012.dat")
+    a = AirfoilToolsDatFile("NACA/tests/data/airfoiltools/NACA2412.dat")
     print(a.df)
+    a.plot()
