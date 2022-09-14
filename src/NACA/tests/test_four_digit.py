@@ -10,24 +10,40 @@ class TestFourDigitSym(object):
     def test_0012(self):
         filename = "NACA/tests/data/airfoiltools/NACA0012.dat"
         a = AirfoilToolsDatFile(filename)
-        NACA0012 = NACA.factory("0012", cs=False)
-        # print(NACA0012.df.to_string())
-        assert  NACA0012.df.loc[0.0, "yu"] == 0.0
-        assert  NACA0012.df.loc[0.0, "yl"] == 0.0
-        assert NACA0012.df["yu"][1] == 0.017037073971
-        assert NACA0012.df["yl"][1] == -0.017037073971
-        assert round(NACA0012.df["yu"][50], 6) == 0.052940
-        assert all(NACA0012.df["yu"] == NACA0012.df["yl"] * -1)
-    def test_0012_cs(self):
-        filename = "NACA/tests/data/airfoiltools/NACA0012.dat"
+        a.plot()
+        n = NACA.factory("0012", cs=False, precision=6)
+        n.plot()
+        print(n.df.columns.tolist())
+        print(n.df.to_string())
+        assert all(n.df["yu"] == n.df["yl"] * -1)
+        assert  n.df.loc[0, "yu"] == 0.0
+        assert  n.df.loc[0, "yl"] == 0.0
+        assert n.df["yu"][50] == a.df["yu"][50]
+        assert n.df["xu"][a.s // 2] == a.df["xu"][a.s // 2]
+        assert n.df["xl"][a.s // 2] == a.df["xl"][a.s // 2]
+        assert n.df["yu"][1] == a.df["yu"][1]
+        assert n.df["yl"][1] == a.df["yl"][1]
+        assert n.df["yu"][a.s // 2] == a.df["yu"][a.s // 2]
+        assert n.df["yl"][a.s // 2] == a.df["yl"][a.s // 2]
+
+    def test_c0012_cs(self):
+        filename = "NACA/tests/data/airfoiltools/NACA0012_cs.dat"
         a = AirfoilToolsDatFile(filename)
-        NACA0012 = NACA.factory("0012", cs=True)
-        assert  NACA0012.df.loc[0.0, "yu"] == 0.0
-        assert  NACA0012.df.loc[0.0, "yl"] == 0.0
-        assert NACA0012.df["yu"][1] == 0.002779436649037656
-        assert NACA0012.df["yl"][1] == -0.002779436649037656
-        assert round(NACA0012.df["yu"][50],6) == 0.052940
-        assert all(NACA0012.df["yu"] == NACA0012.df["yl"] * -1)
+        n = NACA.factory("0012", cs=True, precision=6)
+        n.plot()
+        a.plot()
+        assert  n.df.loc[0, "yu"] == 0.0
+        assert  n.df.loc[0, "yl"] == 0.0
+        assert n.df["yu"][1] ==a.df["yu"][1]
+        assert n.df["yl"][1] ==a.df["yl"][1]
+        assert n.df["yu"][50] == a.df["yu"][50]
+        assert n.df["yl"][50] == a.df["yl"][50]
+        assert n.df["xu"][a.s // 2] == a.df["xu"][a.s // 2]
+        assert n.df["xl"][a.s // 2] == a.df["xl"][a.s // 2]
+        assert n.df["yu"][1] == a.df["yu"][1]
+        assert n.df["yl"][1] == a.df["yl"][1]
+        assert n.df["yu"][a.s // 2] == a.df["yu"][a.s // 2]
+        assert n.df["yl"][a.s // 2] == a.df["yl"][a.s // 2]
 
 
     def test_2412(self):
@@ -35,31 +51,70 @@ class TestFourDigitSym(object):
         a = AirfoilToolsDatFile(filename)
 
         assert a.s == 100
-        NACA2412 = NACA.factory("2412", s=a.s, cs=False)
-        NACA2412.plot()
-        print(NACA2412.df)
-        assert a.s == NACA2412.s
-        assert round(NACA2412.df["yu"][1],6) == a.df["yu"][1]
-        assert round(NACA2412.df["yl"][1],6) == a.df["yl"][1]
+        n = NACA.factory("2412", s=a.s, cs=False, precision=6)
+        n.plot()
+        print(n.df)
+        assert a.s == n.s
+        assert n.df["yu"][1] == a.df["yu"][1]
+        assert n.df["yl"][1] == a.df["yl"][1]
+        assert n.df["xu"][a.s // 2] == a.df["xu"][a.s // 2]
+        assert n.df["xl"][a.s // 2] == a.df["xl"][a.s // 2]
+        assert n.df["yu"][1] == a.df["yu"][1]
+        assert n.df["yl"][1] == a.df["yl"][1]
+        assert n.df["yu"][a.s // 2] == a.df["yu"][a.s // 2]
+        assert n.df["yl"][a.s // 2] == a.df["yl"][a.s // 2]
 
     def test_2412_cs(self):
         filename = "NACA/tests/data/airfoiltools/NACA2412_cs.dat"
         a = AirfoilToolsDatFile(filename)
         a.plot()
         print(a.df)
-        NACA2412 = NACA.factory("2412", s=a.s,cs=True)
-        NACA2412.plot()
-        print(NACA2412.df)
+        n = NACA.factory("2412", s=a.s,cs=True, precision=6)
+        n.plot()
+        print(n.df)
         assert a.s == 100
-        assert a.s == NACA2412.s
-        assert round(NACA2412.df["xu"][1],6) == a.df["xu"][1]
-        assert round(NACA2412.df["xl"][1],6) == a.df["xl"][1]
-        assert round(NACA2412.df["xu"][a.s//2],6) == a.df["xu"][a.s//2]
-        assert round(NACA2412.df["xl"][a.s//2],6) == a.df["xl"][a.s//2]
-        assert round(NACA2412.df["yu"][1],6) == a.df["yu"][1]
-        assert round(NACA2412.df["yl"][1],6) == a.df["yl"][1]
-        assert round(NACA2412.df["yu"][a.s//2],6) == a.df["yu"][a.s//2]
-        assert round(NACA2412.df["yl"][a.s//2],6) == a.df["yl"][a.s//2]
+        assert a.s == n.s
+        assert n.df["xu"][1] == a.df["xu"][1]
+        assert n.df["xl"][1] == a.df["xl"][1]
+        assert n.df["xu"][a.s//2] == a.df["xu"][a.s//2]
+        assert n.df["xl"][a.s//2] == a.df["xl"][a.s//2]
+        assert n.df["yu"][1] == a.df["yu"][1]
+        assert n.df["yl"][1] == a.df["yl"][1]
+        assert n.df["yu"][a.s//2] == a.df["yu"][a.s//2]
+        assert n.df["yl"][a.s//2] == a.df["yl"][a.s//2]
+
+
+    def test_8412(self):
+        filename = "NACA/tests/data/airfoiltools/NACA8412.dat"
+        a = AirfoilToolsDatFile(filename)
+
+        assert a.s == 100
+        n = NACA.factory("8412", s=a.s, cs=False, precision=6)
+        n.plot()
+        print(n.df)
+        assert a.s == n.s
+        assert round(n.df["yu"][1], 6) == a.df["yu"][1]
+        assert round(n.df["yl"][1], 6) == a.df["yl"][1]
+
+    def test_8412_cs(self):
+        filename = "NACA/tests/data/airfoiltools/NACA8412_cs.dat"
+        a = AirfoilToolsDatFile(filename)
+        a.plot()
+        print(a.df)
+        n = NACA.factory("8412", s=a.s,cs=True, precision=6)
+        n.plot()
+        print(n.df)
+        assert a.s == 100
+        assert a.s == n.s
+        assert n.df["xu"][1]== a.df["xu"][1]
+        assert n.df["xl"][1] == a.df["xl"][1]
+        assert n.df["xu"][a.s//2] == a.df["xu"][a.s//2]
+        assert n.df["xl"][a.s//2] == a.df["xl"][a.s//2]
+        assert n.df["yu"][1] == a.df["yu"][1]
+        assert n.df["yl"][1] == a.df["yl"][1]
+        assert n.df["yu"][a.s//2] == a.df["yu"][a.s//2]
+        assert n.df["yl"][a.s//2] == a.df["yl"][a.s//2]
+
 
 
     # def test_available_dat_files(self):
