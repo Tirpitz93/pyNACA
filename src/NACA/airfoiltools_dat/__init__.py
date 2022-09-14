@@ -1,10 +1,16 @@
 """
 
 """
+import os
+
+import diskcache
 import pandas
 from matplotlib import pyplot as plt
 from pandas import Series
+from diskcache import Cache
+from pandas import Series, DataFrame
 
+airfoiltools_cache = Cache(os.path.join(os.path.dirname(__file__), "cache"))
 
 class AirfoilToolsDatFile(object):
 
@@ -30,6 +36,11 @@ class AirfoilToolsDatFile(object):
         # print(self.top)
         # print(self.bottom)
 
+    @staticmethod
+    @airfoiltools_cache.memoize("airfoil",expire=0, tag="airfoiltools_dat")
+    def load(designation: str) -> DataFrame:
+        #todo: load dat file from airfoiltools.com
+        raise NotImplementedError
     def plot(self) -> None:
         """
         Plots the airfoil.
