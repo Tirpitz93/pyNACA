@@ -12,7 +12,7 @@
 %
 % OPTIONAL INPUT DATA
 %   alpha --> Angle of attack (º) (0º default)
-%   c --> Chord of airfoil (m) (1 m default)
+%   chord_length --> Chord of airfoil (m) (1 m default)
 %   s --> Number of points of airfoil (1000 default)
 %   cs --> Linear or cosine spacing (0 or 1 respectively) (1 default)
 %   cte --> Opened or closed trailing edge (0 or 1 respectively) (0 default)

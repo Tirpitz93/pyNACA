@@ -1,13 +1,10 @@
-import re
-
 import abc
 import re
 from functools import wraps
 
 import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
-from numpy import arctan as atan, sin, cos, pi, zeros, linspace
+from numpy import arctan as atan, sin
 import pandas as pd
 from numpy import cos, pi, zeros, linspace
 from pandas import DataFrame, Series
@@ -26,28 +23,35 @@ def scale(func):
         print(self.__dict__)
         return func(self, *args, **kwargs) * self.chord_length
 
+
     scaled.__name__ = func.__name__
     scaled.__doc__ = func.__doc__
     return scaled
 
-
 class NACA(abc.ABC):
     """
     """
+
+    def __init__(self, n: [str, int], alpha=0, chord_length=1, s=100, cs: bool = False, ct:bool=False, precision=0):
+        raise NotImplementedError("Please Use NACA.factory() instead")
+        self.n = str(n)
+        self.alpha = alpha
+        self.chord_length = chord_length
+        self.s = s
+        self.cs = cs
+        self.ct = ct
+        self.precision = precision
+
+    def _base_init(self, n: [str, int], alpha=0, chord_length=1, s=100, cs: bool = False,ct:bool=False, precision=0):
+        pass
     subclasses = []
     def dat_file(self):
         df = DataFrame({"x": np.concatenate(self.xu, self.xu), "y": np.concatenate(self.yu, self.yl)})
         return df.to_csv(sep="\t", index=False)
 
-    def __init__(self):
-        """
-        Do not call this directly. Use NACA.factory().
-        """
-        raise TypeError("Use NACA.factory() to create a NACA object")
-        self.chord_length = 1
-        self.n = 100
-        self.cs = False
-        self.thickness = 0.12
+    # def dat_file(self):
+    #     df = DataFrame({"x": np.concatenate(self.xu, self.xu), "y": np.concatenate(self.yu, self.yl)})
+    #     return df.to_csv(sep="\t", index=False)
 
     @classmethod
     def check_digits(cls, digits: [str, int]):
@@ -61,13 +65,6 @@ class NACA(abc.ABC):
         :return:
         """
         return 0.5 * (1 - cos(s * pi))
-
-    @classmethod
-    def factory(cls, identifier: [int, str], n: int = 100, chord=1, cs: bool = False):
-        for subclass in cls.subclasses:
-            if subclass.check_digits(identifier):
-                return subclass(identifier, n, chord, cs)
-        raise ValueError(f"Invalid NACA identifier: {identifier}")
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -93,6 +90,14 @@ class NACA(abc.ABC):
         """
         return Series(linspace(0, 1, self.n + 1), name="x" ) if not self.cs else Series(self.cosine_spacing(linspace(0, 1, self.n + 1) ), name="x")
 
+    @classmethod
+    def factory(cls, n: [str, int], alpha=0, chord_length=1, s=100, cs: bool = False, precision=0):
+        subclass: NACA
+        for subclass in cls.subclasses:
+            if subclass.check_digits(n):
+                return subclass(n, alpha, chord_length, s, cs, precision)
+        else:
+            raise ValueError("Invalid NACA code.")
     def plot(self) -> None:
         """
         Plots the airfoil.
@@ -105,47 +110,19 @@ class NACA(abc.ABC):
         if "xc" in self.df.columns.tolist() and "yc" in self.df.columns.tolist():
             ax.plot(self.df["xc"], self.df["yc"])
         fig.legend(["Upper Surface", "Lower Surface", "Camber Line"])
+        plt.title(f"NACA {self.n} {'cs' if self.cs else ''} Airfoil (Generated)")
         # plt.xlim(0, 1)
         # plt.ylim(-0.5, 0.5)
         plt.gca().set_aspect('equal', adjustable='box')
         fig.show()
 
-class FourDigit(NACA):
-
-    def __init__(self, n: [str, int], alpha=0, chord_length=1, s=100, cs: bool = True):
-        """
-        Generates a NACA 4-digit airfoil.
-        :param n:
-        :param alpha:
-        :param chord_length:
-        :param s:
-        :return: DataFrame
-        """
-        super().__init__(n, alpha, chord_length, s, cs)
-        # 4 Digit Series
     @property
-    @scale
-    def spacing(self) -> np.array:
+    def camber_line(self):
         """
-        Returns the spacing of the camber line.
+        Returns the camber line.
         :return:
         """
-        return self.x
-
-    @property
-    @scale
-    def yu(self) -> DataFrame:
-        raise NotImplementedError
-
-    @property
-    @scale
-    def xl(self) -> DataFrame:
-        raise NotImplementedError
-
-    @property
-    @scale
-    def yl(self) -> DataFrame:
-        raise NotImplementedError
+        return Series([self._camber_line(x) for x in self.x], index=self.x, name="Camber Line")
 
     @property
     def camber_gradient(self):
@@ -156,38 +133,21 @@ class FourDigit(NACA):
 
         return Series([self._camber_gradient(x) for x in self.x], index=self.x, name="Camber Gradient")
 
-        if isinstance(n, str):
-            thickness = int(n[2:]) / 100
-            camber = int(n[0]) / 100
-            camber_position = int(n[1]) / 10
-        else:
-            thickness = n % 100 / 100
-            camber = n // 1000 / 100
-            camber_position = (n % 1000) // 100 / 10
-        self.initial_x = linspace(0, 1, s + 1)
-        if cs:
-            self.initial_x = self.cosine_spacing(self.initial_x)
-        # Camber Line
-        self.initial_x * self.chord_length
-        self.camber_gradient =  zeros(s + 1)
-        self.y_camber = zeros(s + 1)
-        if camber != 0:
-            for i in range(s + 1):
-                if self.initial_x[i] <= camber_position:
-                    self.y_camber[i] = camber / camber_position ** 2 * (2 * camber_position * self.initial_x[i] - self.initial_x[i] ** 2)
-                    self.camber_gradient[i] = 2 * camber / camber_position ** 2 * (camber_position - self.initial_x[i])
-                else:
-                    self.y_camber[i] = camber / (1 - camber_position) ** 2 * (
-                            (1 - 2 * camber_position) + 2 * camber_position * self.initial_x[i] - self.initial_x[i] ** 2)
-                    self.camber_gradient[i] = 2 * camber / (1 - camber_position) ** 2 * (camber_position - self.initial_x[i])
     @property
-    def camber_line(self):
-        """
-        Returns the camber line.
-        :return:
-        """
-        return Series([self._camber_line(x) for x in self.x], index=self.x, name="Camber Line")
+    @scale
+    def yu(self) -> DataFrame:
+        raise NotImplementedError
 
+
+    @property
+    @scale
+    def xl(self) -> DataFrame:
+        raise NotImplementedError
+
+    @property
+    @scale
+    def yl(self) -> DataFrame:
+        raise NotImplementedError
 
     @property
     def camber(self) -> DataFrame:
@@ -212,28 +172,29 @@ class FourDigit(NACA):
         raise NotImplementedError
 
 
+
+
 class NACA4Digit(NACA):
     a1 = 0.2969
     a2 = -0.126
     a3 = -0.3516
     a4 = 0.2843
     a5 = -0.1015
-    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False, ct:bool=False):
+    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False, ct:bool=False, precision=0):
         self.identifier = identifier
         if isinstance(identifier, int):
             self.identifier = str(identifier)
         self.n = n
-        self.chord_length = chord
-        self.ct = ct
-        if self.ct:
-            self.a5 = 0.1036
-
-        self.max_camber = int(self.identifier[0]) / 100
-        self.max_camber_position = int(self.identifier[1]) / 10
-        self.thickness = int(self.identifier[2:]) / 100
-        self.top = zeros(n)
-        self.bottom = zeros(n)
         self.cs = cs
+        self.chord_length = chord
+        self.digit_1 = int(self.identifier[0])
+        self.digit_2 = int(self.identifier[1])
+        self.digit_3 = int(self.identifier[2])
+        self.digit_4_5 = int(self.identifier[3:])
+
+        self.max_camber = self.digit_1 / 10
+        self.max_camber_position = self.digit_2 / 10
+
         if self.ct:
             assert self.a5 == 0.1036
         else:
@@ -273,6 +234,15 @@ class NACA4Digit(NACA):
             return True if 1000 <= digits <= 9999 else False
         raise TypeError("digits must be str or int")
 
+    @property
+    @scale
+    def xu(self) -> Series:
+        return self.x
+
+    @property
+    @scale
+    def yu(self) -> Series:
+        return self.y_camber_line + self.y_thickness
 
 
 class NACA5DigitStandard(NACA4Digit):
@@ -293,7 +263,7 @@ class NACA5DigitStandard(NACA4Digit):
 
     }
 
-    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False):
+    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False, ct:bool=False, precision=0):
 
         self.identifier = identifier
         if isinstance(identifier, int):
@@ -373,9 +343,10 @@ class NACA5DigitReflex(NACA5DigitStandard):
         5: 0.1355,
     }
 
-    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False):
+    def __init__(self, identifier: [int, str], n: int = 100, chord=1, cs: bool = False, ct: bool = False, precision:
+    int =0):
 
-        super().__init__(identifier, n, chord, cs)
+        super().__init__(identifier, n, chord, cs, ct, precision)
         self.reflex = True
 
     @classmethod
@@ -406,9 +377,7 @@ class NACA5DigitReflex(NACA5DigitStandard):
                         - ((r ** 3) * x)
                         + (r ** 3))
         )
-    @property
-    def camber_line(self):
-        return Series([self._camber_line(x) for x in self.x], index=self.x)
+
 
 
     def _camber_gradient(self, x):
@@ -429,22 +398,19 @@ class NACA5DigitReflex(NACA5DigitStandard):
                         - (k2_k1 * (1 - r) ** 3)
                         - (r ** 3))
         )
-    @property
-    def camber_gradient(self):
-
-
-        return Series([self._camber_gradient(x) for x in self.x], index=self.x)
 
 if __name__ == '__main__':
-    NACA0012 = NACA.factory("2412", cs=True)
-    # print(NACA0012.dat_file())
-    print(NACA0012.df)
-    NACA0012.plot()
-
-    ns = NACA.factory("23112", chord=4, cs=True)
-    ni = NACA.factory(23112, chord=4, cs=True)
+    ns = NACA.factory("23112", chord_length=4, cs=True)
+    ni = NACA.factory(23112, chord_length=4, cs=True)
     print(ni.identifier)
     print(ni.__class__.__name__)
+
+
+    NACA0012 = NACA.factory("2412", cs=True)
+    # print(NACA0012.dat_file())
+    print(NACA0012.__class__.__name__)
+    NACA0012.plot()
+
     assert ns.identifier == ni.identifier
     assert ns.__class__.__name__ == ni.__class__.__name__
     assert ns.max_camber == ni.max_camber == 0.2
