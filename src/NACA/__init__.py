@@ -3,12 +3,10 @@ import re
 from functools import wraps
 
 import numpy as np
-from matplotlib import pyplot as plt
-from numpy import arctan as atan, sin, sqrt
 import pandas as pd
-from numpy import cos, pi, zeros, linspace
+from matplotlib import pyplot as plt
+from numpy import cos, pi, linspace, arctan as atan, sqrt, sin
 from pandas import DataFrame, Series
-
 
 def scale(func):
     """
@@ -46,8 +44,7 @@ def round(func):
     scaled.__doc__ = func.__doc__
     return scaled
 
-
-class NACA(abc.ABC):
+class NACABase(abc.ABC):
     """
     """
 
@@ -121,7 +118,9 @@ class NACA(abc.ABC):
 
     @classmethod
     def factory(cls, n: [str, int], s=100, alpha=0, chord_length=1, cs: bool = False, precision=0):
-        subclass: type(NACA)
+        subclass: type(NACABase)
+        print("factory")
+        print(cls.subclasses)
         for subclass in cls.subclasses:
             if subclass.check_digits(n):
                 return subclass(n=n, s=s, alpha=alpha, chord_length=chord_length, cs=cs, precision=precision)
@@ -229,7 +228,7 @@ class NACA(abc.ABC):
         return atan(camber_gradient)
 
 
-class NACA4Digit(NACA):
+class NACA4Digit(NACABase):
     a1 = 0.2969
     a2 = -0.126
     a3 = -0.3516
@@ -396,6 +395,7 @@ class NACA5DigitStandard(NACA4Digit):
 
     @classmethod
     def check_digits(cls, digits: [str, int]):
+        print("Checking digits for NACA5DigitStandard")
         if isinstance(digits, str):
             return True if re.match(r"^[\d]{2}0[\d]{2}$", digits) else False
         elif isinstance(digits, int):
@@ -483,33 +483,5 @@ class NACA5DigitReflex(NACA5DigitStandard):
         )
 
 
-if __name__ == '__main__':
-    ns = NACA.factory("23112", chord_length=4, cs=True)
-    ni = NACA.factory(23112, chord_length=4, cs=True)
-    print(ni.n)
-    print(ni.__class__.__name__)
+__all__ = []
 
-    NACA0012 = NACA.factory("2412", cs=True)
-    # print(NACA0012.dat_file())
-    print(NACA0012.__class__.__name__)
-    NACA0012.plot()
-
-    assert ns.n == ni.n
-    assert ns.__class__.__name__ == ni.__class__.__name__
-    assert ns.max_camber == ni.max_camber == 0.2
-    assert ns.max_camber_position == ni.max_camber_position == 0.15
-    assert ns.thickness == ni.thickness == 0.12
-    print(ns.design_cl)
-    assert ns.design_cl == ni.design_cl == 0.3
-    print(ns.camber_line)
-    print(ns.camber_gradient)
-    n4s = NACA.factory("2312", chord=4)
-    n4i = NACA.factory(2312, chord=4)
-    print(n4s.n)
-    print(n4s.__class__.__name__)
-    assert n4s.n == n4i.n == "2312"
-    assert n4s.__class__.__name__ == n4i.__class__.__name__ == "NACA4Digit"
-    print(n4s.max_camber)
-    assert n4s.max_camber == n4i.max_camber == 0.02
-    assert n4s.max_camber_position == n4i.max_camber_position == 0.3
-    assert n4s.thickness == n4i.thickness == 0.12
