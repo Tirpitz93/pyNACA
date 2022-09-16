@@ -5,6 +5,7 @@ from functools import wraps
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 from numpy import cos, pi, linspace, arctan as atan, sqrt, sin
 from pandas import DataFrame, Series
 
@@ -52,7 +53,7 @@ class NACABase(abc.ABC):
 
     def __init__(self, n: [str, int], alpha=0, chord_length=1, s=100, cs: bool = False, ct: bool = True, precision=0):
         raise NotImplementedError("Please Use NACA.factory() instead")
-        self.n: str = str(n)
+        self.s: str = str(n)
         self.alpha: float = alpha
         self.chord_length: float = chord_length
         self.s: int = s
@@ -117,13 +118,13 @@ class NACABase(abc.ABC):
         return series
 
     @classmethod
-    def factory(cls, n: [str, int], s=100, alpha=0, chord_length=1, cs: bool = False, precision=0):
+    def factory(cls, n: [str, int], s=100, alpha=0, chord_length=1, cs: bool = False, ct = True, precision=0):
         subclass: type(NACABase)
         print("factory")
         print(cls.subclasses)
         for subclass in cls.subclasses:
             if subclass.check_digits(n):
-                return subclass(n=n, s=s, alpha=alpha, chord_length=chord_length, cs=cs, precision=precision)
+                return subclass(n=n, s=s, alpha=alpha, chord_length=chord_length, cs=cs, ct=ct, precision=precision)
         else:
             raise ValueError("Invalid NACA code.")
 
@@ -141,14 +142,16 @@ class NACABase(abc.ABC):
         fig.legend(["Upper Surface", "Lower Surface", "Camber Line"])
         plt.title(f"NACA {self.n} {'cs' if self.cs else ''} Airfoil (Generated)")
         # plt.xlim(0, 1)
-        # plt.ylim(-0.5, 0.5)
+        plt.ylim(-0.2, 0.2)
         plt.gca().set_aspect('equal', adjustable='box')
         fig.show()
 
+
     def plot_series(self, series: Series, **kwargs):
         fig, ax = plt.subplots()
-        ax.plot(series, **kwargs)
-        plt.gca().set_aspect('equal', adjustable='box')
+        ax.plot(series, marker="o",**kwargs)
+        plt.title(f"{self.n} Series Plot: {series.name}")
+        # plt.gca().set_aspect('equal', adjustable='box')
         fig.show()
 
     @property
@@ -157,7 +160,7 @@ class NACABase(abc.ABC):
         Returns the camber line.
         :return:
         """
-        series = Series([self._camber_line(x) for x in self.x], name="Camber Line")
+        series = Series([self._camber_line(x) for x in self.x], name="yc")
         # print(series)
         # self.plot_series(series)
         return series
@@ -197,7 +200,7 @@ class NACABase(abc.ABC):
 
     @property
     def camber(self) -> DataFrame:
-        return pd.concat([Series(self.x, name="xc"), self.y_camber_line, self.camber_gradient], axis=1, names=["xc", "yc", "dycdx"])
+        return pd.concat([Series(self.x, name="xc"), self.camber_line, self.camber_gradient], axis=1, names=["xc", "yc", "dycdx"])
 
     @property
     def upper(self) -> DataFrame:
@@ -215,7 +218,7 @@ class NACABase(abc.ABC):
     @round
     def df(self) -> DataFrame:
         df = pd.concat([self.upper, self.lower, self.camber], axis=1, names=[["xu", "yu"], ["xl", "yl"],["xc","yc", "dycdx"]], )
-        df.name = f"Airfoil: NACA {self.n}"
+        df.name = f"Airfoil: NACA {self.s}"
         return df
 
     def _camber_gradient(self, x):
@@ -263,21 +266,15 @@ class NACA4Digit(NACABase):
         else:
             assert self.a5 == -0.1015
 
-    @property
-    def y_camber_line(self) -> Series:
-        series = Series([self._camber_line(x) for x in self.x], name="yc")
-        # self.plot_series(series)
-        return series
-
     def _camber_line(self, x):
         """
         Returns the y coordinate of the camber line at x.
         :param x:
         :return:
         """
-        return self.max_camber / (self.max_camber_position ** 2) * (
-                2 * self.max_camber_position * x - x ** 2) if x < self.max_camber_position else self.max_camber / (
-                1 - self.max_camber_position) ** 2 * (
+        return (self.max_camber / (self.max_camber_position ** 2)) * (
+                2 * self.max_camber_position * x - x ** 2) if x < self.max_camber_position else (self.max_camber / (
+                1 - self.max_camber_position) ** 2) * (
                 1 - 2 * self.max_camber_position + 2 * self.max_camber_position * x - x ** 2)
 
     def _camber_gradient(self, x):
@@ -319,6 +316,7 @@ class NACA4Digit(NACABase):
     @scale
     def xu(self) -> Series:
         series = Series(self.x - self.y_thickness * sin(self.theta), name="xu")
+        # self.plot_series(series)
         return series
 
     @property
@@ -358,20 +356,21 @@ class NACA5DigitStandard(NACA4Digit):
         super().__init__(n=n, s=s, alpha=alpha, chord_length=chord_length, cs=cs, precision=precision)
         self.ct = ct
         self.precision = precision
-        self.identifier = n
+        self.n = n
         if isinstance(n, int):
-            self.identifier = str(n)
-        self.n = s
+            self.n = str(n)
+        self.s = s
         self.cs = cs
         self.chord_length = chord_length
-        self.digit_1 = int(self.identifier[0])
-        self.digit_2 = int(self.identifier[1])
-        self.digit_3 = int(self.identifier[2])
-        self.digit_4_5 = int(self.identifier[3:])
+        self.digit_1 = int(self.n[0])
+        self.digit_2 = int(self.n[1])
+        self.digit_3 = int(self.n[2])
+        self.digit_4_5 = int(self.n[3:])
 
         self.max_camber = self.digit_1 / 10
+        print(f"digit_2: {self.digit_2}")
         self.max_camber_position = self.digit_2 / 20
-
+        print(f"max_camber_position: {self.max_camber_position}")
         self.design_cl = self.digit_1 * (3 / 20)
 
         self.thickness = self.digit_4_5 / 100
@@ -384,14 +383,16 @@ class NACA5DigitStandard(NACA4Digit):
     def _camber_line(self, x):
         k1 = self.k_1_values[self.digit_2]
         r = self.r_values[self.digit_2]
-        return (k1 / 6) * (x ** 3 - 3 * r * x ** 2 + r ** 2 * (3 - r) * x) if x <= self.max_camber_position else \
+        print(f"k1: {k1}")
+        print(f"r: {r}")
+        return (k1 / 6) * ((x ** 3) - (3 * r * (x ** 2)) + ((r ** 2) * (3 - r) * x)) if x < self.max_camber_position else \
             ((k1 * r ** 3) / 6) * (1 - x)
 
     def _camber_gradient(self, x):
         k1 = self.k_1_values[self.digit_2]
         r = self.r_values[self.digit_2]
-        return (k1 / 6) * (3 * x ** 2 - 6 * r * x + r ** 2 * (3 - r)) if x <= self.max_camber_position else \
-            -((k1 * r ** 3) / 6)
+        return (k1 / 6) * ((3 * (x ** 2)) - (6 * r * x) +( r ** 2) * (3 - r)) if x < self.max_camber_position else \
+            -(k1 * r ** 3) / 6
 
     @classmethod
     def check_digits(cls, digits: [str, int]):
@@ -402,10 +403,6 @@ class NACA5DigitStandard(NACA4Digit):
             return True if 10000 <= digits <= 99999 and digits % 1000 // 100 == 0 else False
         raise TypeError("digits must be str or int")
 
-    @classmethod
-    def check_code(cls, code):
-        return (isinstance(code, int) and 1000 <= code <= 9000) or (isinstance(code, str) and re.match(r"^\d{4}$",
-                                                                                                       code))
 
 
 class NACA5DigitReflex(NACA5DigitStandard):

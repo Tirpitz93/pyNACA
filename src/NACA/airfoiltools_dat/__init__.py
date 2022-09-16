@@ -3,6 +3,7 @@
 """
 import logging
 import os
+import re
 from io import StringIO
 from logging import getLogger, basicConfig
 
@@ -25,14 +26,19 @@ logger.error(airfoiltools_cache.stats())
 class AirfoilToolsDatFile(object):
 
     def __init__(self, filename: str=None, file=None):
-        if filename is None and file is not None:
+        self.designation = "None"
+        if file is not None:
             self.populate(file)
-        else:
+            self.designation = filename
+        elif filename is not None:
             with open(filename, "r") as f:
                 f.readline()
                 self.populate(f)
+            print(filename)
+            self.designation = re.match(r"(.*)?NACA([\d]{4,})(.*)?",filename)[2]
+            print(self.designation)
 
-        self.filename = filename
+        # self.filename = filename
 
 
 
@@ -54,23 +60,35 @@ class AirfoilToolsDatFile(object):
         self.s = len(self.df) - 1
 
     @staticmethod
-    @airfoiltools_cache.memoize("airfoil", expire=None, tag="airfoiltools_dat")
+    # @airfoiltools_cache.memoize("airfoil", expire=None, tag="airfoiltools_dat")
     def load(designation: str, s: int = 100, cs: bool = True, ct: bool = False) -> "AirfoilToolsDatFile":
         """
         Loads an airfoil from the airfoiltools.com database.
         :param designation:
         :return:
         """
-        url = f"http://airfoiltools.com/airfoil/naca4digit?MNaca4DigitForm%5Bcamber%5D={designation[0]}&MNaca4DigitForm%5Bposition%5D={int(designation[1]) * 10}&MNaca4DigitForm%5Bthick%5D={designation[2:]}&MNaca4DigitForm%5BnumPoints%5D={s*2}&MNaca4DigitForm%5BcosSpace%5D={int(cs)}&MNaca4DigitForm%5BcosSpace%5D={int(cs)}&MNaca4DigitForm%5BcloseTe%5D={int(ct)}&MNaca4DigitForm%5BcloseTe%5D={int(ct)}&yt0=Plot"
+        if len(designation) == 4:
+            url = f"http://airfoiltools.com/airfoil/naca4digit?MNaca4DigitForm%5Bcamber%5D={designation[0]}&MNaca4DigitForm%5Bposition%5D={int(designation[1]) * 10}&MNaca4DigitForm%5Bthick%5D={designation[2:]}&MNaca4DigitForm%5BnumPoints%5D={s*2}&MNaca4DigitForm%5BcosSpace%5D={int(cs)}&MNaca4DigitForm%5BcosSpace%5D={int(cs)}&MNaca4DigitForm%5BcloseTe%5D={int(ct)}&MNaca4DigitForm%5BcloseTe%5D={int(ct)}&yt0=Plot"
+        elif len(designation) == 5:
+            url= f"http://airfoiltools.com/airfoil/naca5digit?MNaca5DigitForm%5Bcl%5D={3/20*int(designation[0])}&MNaca5DigitForm%5BposKey%5D={5*int(designation[1])}_{designation[2]}&MNaca5DigitForm%5Bthick%5D={int(designation[3:])}&MNaca5DigitForm%5BnumPoints%5D={s*2}&MNaca5DigitForm%5BcosSpace%5D={int(cs)}&MNaca5DigitForm%5BcosSpace%5D={int(cs)}&MNaca5DigitForm%5BcloseTe%5D={int(ct)}&MNaca5DigitForm%5BcloseTe%5D={int(ct)}&yt0=Plot"
+
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(requests.get(url).text, "html.parser")
         # print(url)
         # print(soup)
         # print(soup.find("pre").text)
         text = soup.find("pre").text.strip().split("\n", maxsplit=1)[1]
+        print(url)
+        try:
+            assert soup.find("title").text.find(designation)!=-1
+        except AssertionError as e:
+            print(soup.find("title").text)
+            print(designation)
+            print(url)
+
 
         # print(text)
-        return AirfoilToolsDatFile(file=StringIO(text))
+        return AirfoilToolsDatFile(file=StringIO(text), filename=designation)
 
 
     def plot(self) -> None:
@@ -86,9 +104,9 @@ class AirfoilToolsDatFile(object):
             ax.plot(self.df["xc"], self.df["yc"])
         # ax.plot(self.df["xc"], self.df["yc"])
         fig.legend(["Upper Surface", "Lower Surface", "Camber Line"])
-        plt.title(f"{os.path.splitext(os.path.basename(self.filename))[0]} Airfoil (Loaded from AirfoilTools.com)")
+        plt.title(f"{self.designation} Airfoil (Loaded from AirfoilTools.com)")
         # plt.xlim(0, 1)
-        # plt.ylim(-0.5, 0.5)
+        plt.ylim(-0.2, 0.2)
         plt.gca().set_aspect('equal', adjustable='box')
         fig.show()
 
