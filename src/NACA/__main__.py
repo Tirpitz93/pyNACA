@@ -13,6 +13,7 @@ if __name__ == '__main__':
     foils = [
         NACABase.factory("0005", cs=True,ct=True),
         NACABase.factory("0012", cs=True,ct=True),
+        NACABase.factory("6212", cs=True,ct=True),
         NACA4Digit("2412", cs=True),
         NACA4Digit("3212", cs=True),
         NACA5DigitStandard("24006", cs=True),

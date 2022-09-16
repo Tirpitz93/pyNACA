@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
-from numpy import cos, pi, linspace, arctan as atan, sqrt, sin
+from numpy import cos, pi, linspace, arctan as atan, sqrt, sin, arctan2, arctan
 from pandas import DataFrame, Series
 
 def scale(func):
@@ -18,8 +18,8 @@ def scale(func):
 
     @wraps(func)
     def scaled(self: "NACA", *args, **kwargs):
-        print(f"Scaling by {self.chord_length}")
-        print(self.__dict__)
+        # print(f"Scaling by {self.chord_length}")
+        # print(self.__dict__)
         return func(self, *args, **kwargs) * self.chord_length
 
     scaled.__name__ = func.__name__
@@ -36,8 +36,8 @@ def round(func):
 
     @wraps(func)
     def scaled(self: "NACA", *args, **kwargs):
-        print(f"Rounding to {self.precision}")
-        print(self.__dict__)
+        # print(f"Rounding to {self.precision}")
+        # print(self.__dict__)
         _ret = func(self, *args, **kwargs)
         return _ret.round(self.precision) if self.precision else _ret
 
@@ -66,7 +66,7 @@ class NACABase(abc.ABC):
         pass
 
     def dat_file(self):
-        df = DataFrame({"x": np.concatenate(self.xu, self.xu), "y": np.concatenate(self.yu, self.yl)})
+        df = DataFrame({"x": pd.concat([self.xu[::-1], self.yu]), "y": np.concatenate([self.yu[::-1], self.yl])})
         return df.to_csv(sep="\t", index=False)
 
     # def dat_file(self):
@@ -228,7 +228,7 @@ class NACABase(abc.ABC):
         raise NotImplementedError
 
     def _theta(self, camber_gradient):
-        return atan(camber_gradient)
+        return arctan(camber_gradient)
 
 
 class NACA4Digit(NACABase):
@@ -383,15 +383,15 @@ class NACA5DigitStandard(NACA4Digit):
     def _camber_line(self, x):
         k1 = self.k_1_values[self.digit_2]
         r = self.r_values[self.digit_2]
-        print(f"k1: {k1}")
-        print(f"r: {r}")
-        return (k1 / 6) * ((x ** 3) - (3 * r * (x ** 2)) + ((r ** 2) * (3 - r) * x)) if x < self.max_camber_position else \
+        # print(f"k1: {k1}")
+        # print(f"r: {r}")
+        return (k1 / 6) * ((x ** 3) - (3 * r * (x ** 2)) + ((r ** 2) * (3 - r) * x)) if x < r else \
             ((k1 * r ** 3) / 6) * (1 - x)
 
     def _camber_gradient(self, x):
         k1 = self.k_1_values[self.digit_2]
         r = self.r_values[self.digit_2]
-        return (k1 / 6) * ((3 * (x ** 2)) - (6 * r * x) +( r ** 2) * (3 - r)) if x < self.max_camber_position else \
+        return (k1 / 6) * ((3 * (x ** 2)) - (6 * r * x) +( r ** 2) * (3 - r)) if x < r else \
             -(k1 * r ** 3) / 6
 
     @classmethod
@@ -428,7 +428,7 @@ class NACA5DigitReflex(NACA5DigitStandard):
     def __init__(self, n: [int, str], s: int = 100, alpha: float = 0, chord_length=1, cs: bool = False, ct: bool = True,
                  precision=0):
 
-        super().__init__(n=n, s=s, alpha=alpha, chord_length=chord_length, cs=cs, precision=precision)
+        super().__init__(n=n, s=s, alpha=alpha, chord_length=chord_length, cs=cs,ct=ct, precision=precision)
         self.reflex = True
 
     @classmethod
@@ -451,7 +451,7 @@ class NACA5DigitReflex(NACA5DigitStandard):
                         - ((r ** 3) * x)
                         + r ** 3)
         ) \
-            if x < self.max_camber_position else (
+            if x < r else (
                 (k1 / 6) *
                 (
                         k2_k1 * (x - r) ** 3
@@ -471,7 +471,7 @@ class NACA5DigitReflex(NACA5DigitStandard):
                         - (k2_k1 * (1 - r) ** 3)
                         - (r ** 3))
         ) \
-            if x < self.max_camber_position else (
+            if x < r else (
                 (k1 / 6) *
                 (
                         3 * k2_k1 * (x - r) ** 2
